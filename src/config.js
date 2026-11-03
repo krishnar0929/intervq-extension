@@ -7,9 +7,10 @@ export const CONFIG = {
   projectId: PROJECT_ID,
   firebaseApiKey: 'AIzaSyBrHN9OWPsQV4cyvcvAKjK0tw3UR_HPzxI',
   apiBase: `https://us-central1-${PROJECT_ID}.cloudfunctions.net/api`,
-  // Optional. A Google Cloud OAuth client ID of type "Web application" whose authorized redirect URI is
-  // https://<extension-id>.chromiumapp.org/ (see README → Google sign-in). Leave empty to hide the button.
-  googleWebClientId: '',
+  // Google sign-in: Firebase's own "Web client (auto created by Google Service)". Its authorized redirect URIs
+  // must include https://<extension-id>.chromiumapp.org/ for each extension ID (unpacked and Web Store).
+  // Leave empty to hide the button.
+  googleWebClientId: '1063334788583-at9vcivuovrlihfbdsonsamh8ohtc6vg.apps.googleusercontent.com',
   siteUrl: `https://${PROJECT_ID}.web.app`,
 };
 

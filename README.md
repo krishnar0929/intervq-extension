@@ -9,8 +9,7 @@ It uses the same IntervQ account, credits and server as the desktop app.
 
 ## What's in v0.1
 
-- **Sign in** with email and password (or create an account), forgot password, email verification.
-  Google sign-in is built in and switches on once `googleWebClientId` is set (see below).
+- **Sign in** with Google, or email and password (or create an account), forgot password, email verification.
 - **Sessions:** Interview (as the candidate or the interviewer), Meeting, Product demo, Presentation, General.
   Add notes, paste or upload text documents (resume, job requirements, agenda), and pick the answer style,
   language and your own answer instructions.
@@ -62,15 +61,16 @@ This makes `dist/intervq-extension.zip` (manifest, icons and `src` only). Upload
 [Chrome Web Store developer dashboard](https://chrome.google.com/webstore/devconsole). Remember to bump
 `version` in `manifest.json` for each upload.
 
-## Google sign-in (optional)
+## Google sign-in
 
-1. Google Cloud console (project `meeting-assist-c5249`) → APIs & Services → Credentials →
-   **Create OAuth client ID** → *Web application*.
-2. Authorized redirect URI: `https://<extension-id>.chromiumapp.org/` (the ID is on the extension card in
-   `chrome://extensions`; it changes once the extension is published, so add both).
-3. Firebase console → Authentication → Sign-in method → Google → add the new client ID under
-   *Safelist client IDs from external projects*.
-4. Put the client ID in `googleWebClientId` in `src/config.js`.
+It uses Firebase's own *Web client (auto created by Google Service)* (`googleWebClientId` in
+`src/config.js`), so Firebase already accepts it. Google only sends people back to redirect URIs listed on
+that client, one per extension ID:
+
+1. Google Cloud console → Google Auth Platform → Clients → **Web client (auto created by Google Service)**.
+2. Under *Authorized redirect URIs*, add `https://<extension-id>.chromiumapp.org/` and save.
+   The unpacked ID (`bnkbhmpdmijaididklhhcglcdgbcenpk` on the dev Mac) is already there. After publishing,
+   add the Chrome Web Store ID too.
 
 ## Next up
 
