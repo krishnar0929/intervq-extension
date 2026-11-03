@@ -180,7 +180,17 @@ export async function signInWithGoogle() {
       nonce,
       prompt: 'select_account',
     });
-  const back = await chrome.identity.launchWebAuthFlow({ url, interactive: true });
+  let back;
+  try {
+    back = await chrome.identity.launchWebAuthFlow({ url, interactive: true });
+  } catch (e) {
+    // Chrome says "The user did not approve access" whenever the Google window closes without signing in,
+    // including after a Google error page.
+    if (/did not approve|closed|cancel/i.test(String(e && e.message))) {
+      throw new Error('Google sign-in was closed before it finished. If Google showed an error, try again in a few minutes.');
+    }
+    throw e;
+  }
   const idToken = new URLSearchParams(new URL(back).hash.slice(1)).get('id_token');
   if (!idToken) throw new Error('Google sign-in was cancelled.');
   const r = await idt('signInWithIdp', {
