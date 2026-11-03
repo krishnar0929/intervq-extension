@@ -44,6 +44,9 @@ async function shortcutLabel() {
 async function friendlyCaptureError(e) {
   const m = String((e && e.message) || e);
   console.warn('IntervQ capture failed:', m);
+  if (/^Chrome pages|cannot capture.*chrome:\/\//i.test(m) && !/not been invoked/i.test(m)) {
+    return "Chrome doesn't allow capturing its own pages. Open your meeting tab and try again.";
+  }
   if (/not been invoked|activeTab/i.test(m)) {
     return `Press ${await shortcutLabel()} while the meeting tab is showing. Chrome needs that before IntervQ can hear the tab. (${m})`;
   }
@@ -133,11 +136,28 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   return true;
 });
 
-// Keyboard shortcut: open the panel (if needed) and toggle listening on the current tab.
+// Keyboard shortcut: the one moment Chrome lets IntervQ capture this tab ("invoked" for activeTab), so the
+// tab's audio is connected right here, before anything else. The capture then stays open for the session, so
+// later taps of the Listen button in the panel work too. Then the panel is opened and told to toggle.
 chrome.commands.onCommand.addListener((command, tab) => {
   if (command !== 'toggle-listen' || !tab) return;
   chrome.sidePanel.open({ windowId: tab.windowId }).catch(() => {});
-  setTimeout(() => toPanel({ type: 'toggle-listen', tabId: tab.id }), 150);
+  (async () => {
+    await ready;
+    let error = null;
+    if (!capture || capture.tabId !== tab.id) {
+      try {
+        await stopCapture();
+        await startCapture(tab.id);
+      } catch (e) {
+        error = await friendlyCaptureError(e);
+      }
+    }
+    const msg = { type: 'toggle-listen', tabId: tab.id, error };
+    // The panel answers when it's open; if it is still loading, it picks the toggle up from here.
+    const answered = await chrome.runtime.sendMessage({ target: 'panel', ...msg }).catch(() => null);
+    if (!answered) await chrome.storage.session.set({ pendingToggle: { ...msg, at: Date.now() } });
+  })();
 });
 
 chrome.tabs.onRemoved.addListener(async (tabId) => {

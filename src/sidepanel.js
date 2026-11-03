@@ -529,6 +529,15 @@ async function cancelListening() {
   setListenUi();
 }
 
+// The keyboard shortcut (handled in the service worker, which has already connected the tab's audio).
+function onShortcut(msg) {
+  if (msg.error) return toast(msg.error, 7000);
+  if (!state.user) return toast('Sign in first.');
+  if (!state.session) return toast('Start a session, then press the shortcut again.');
+  if ($('view-session').hidden) openSession();
+  toggleListening(msg.tabId);
+}
+
 function toggleListening(tabId) {
   if (state.listening) stopListening();
   else startListening(tabId);
@@ -702,16 +711,14 @@ function wire() {
   });
 
   // Messages from the service worker / recorder
-  chrome.runtime.onMessage.addListener((msg) => {
+  chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (!msg || msg.target !== 'panel') return false;
     if (msg.type === 'level' && state.listening) {
       $('mic-ring').style.transform = `scale(${1 + msg.level * 0.25})`;
     } else if (msg.type === 'toggle-listen') {
-      if (state.session && !$('view-session').hidden) toggleListening(msg.tabId);
-      else if (state.session) {
-        openSession();
-        startListening(msg.tabId);
-      } else toast('Start a session first.');
+      onShortcut(msg);
+      sendResponse({ ok: true });
+      return false;
     } else if (msg.type === 'capture-ended') {
       if (state.listening) toast('The meeting tab stopped being captured.');
       state.listening = false;
@@ -760,6 +767,13 @@ async function init() {
   if (state.session) openSession();
   else goHome();
   refreshAccount();
+
+  // The shortcut opened this panel: carry on with the toggle it asked for.
+  const { pendingToggle } = await chrome.storage.session.get('pendingToggle');
+  if (pendingToggle) {
+    await chrome.storage.session.remove('pendingToggle');
+    if (Date.now() - pendingToggle.at < 10000) onShortcut(pendingToggle);
+  }
 }
 
 init();
