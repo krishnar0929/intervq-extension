@@ -37,8 +37,9 @@ const toPanel = (msg) => chrome.runtime.sendMessage({ target: 'panel', ...msg })
 
 function friendlyCaptureError(e) {
   const m = String((e && e.message) || e);
-  if (/not been invoked|activeTab|permission/i.test(m)) {
-    return 'Click the IntervQ icon (or press Option+Shift+Q / Alt+Shift+Q) while the meeting tab is open, then tap Listen again.';
+  console.warn('IntervQ capture failed:', m);
+  if (/not been invoked|activeTab/i.test(m)) {
+    return `Press Option+Shift+Q (Alt+Shift+Q on Windows) while the meeting tab is showing. Chrome needs that before IntervQ can hear the tab. (${m})`;
   }
   if (/active stream|already/i.test(m)) return 'Another extension or app is already capturing this tab. Stop it and try again.';
   if (/chrome:\/\/|webstore|Chrome pages/i.test(m)) return "Chrome doesn't allow capturing this kind of page. Open your meeting tab and try again.";
