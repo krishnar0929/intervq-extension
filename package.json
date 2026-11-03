@@ -1,0 +1,15 @@
+{
+  "name": "intervq-extension",
+  "version": "0.1.0",
+  "private": true,
+  "description": "IntervQ for Chrome: tap to capture a question in a browser meeting and get a suggested answer.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "check": "node scripts/check.js",
+    "zip": "node scripts/check.js && mkdir -p dist && rm -f dist/intervq-extension.zip && zip -r -q dist/intervq-extension.zip manifest.json icons src && echo dist/intervq-extension.zip"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

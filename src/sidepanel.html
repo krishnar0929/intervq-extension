@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>IntervQ</title>
+    <link rel="stylesheet" href="sidepanel.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <img src="../icons/icon32.png" alt="" width="22" height="22" />
+        <span>IntervQ</span>
+      </div>
+      <div class="topbar-right" id="topbar-right" hidden>
+        <span class="pill" id="credits" title="Credits left">–</span>
+        <button class="icon-btn" id="btn-account" title="Account" aria-label="Account">
+          <svg viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4 20c1.5-4 4.5-6 8-6s6.5 2 8 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="account-menu" id="account-menu" hidden>
+      <div class="account-who">
+        <strong id="acct-name"></strong>
+        <span id="acct-email"></span>
+      </div>
+      <div class="account-plan"><span id="acct-plan"></span> · <span id="acct-credits"></span></div>
+      <a class="menu-item" id="acct-manage" target="_blank" rel="noopener">Plans &amp; credits ↗</a>
+      <button class="menu-item" id="acct-signout">Sign out</button>
+    </div>
+
+    <main>
+      <!-- Loading -->
+      <section class="view" id="view-loading">
+        <div class="center muted">Loading…</div>
+      </section>
+
+      <!-- Sign in -->
+      <section class="view" id="view-signin" hidden>
+        <h1>Ace every question.</h1>
+        <p class="muted">Sign in with your IntervQ account. It's the same account as the desktop app.</p>
+        <div class="seg" role="tablist">
+          <button class="seg-btn active" data-auth-tab="signin">Sign in</button>
+          <button class="seg-btn" data-auth-tab="signup">Create account</button>
+        </div>
+        <form id="auth-form" class="stack" novalidate>
+          <label class="field" id="field-name" hidden>
+            <span>Name</span>
+            <input id="auth-name" autocomplete="name" />
+          </label>
+          <label class="field">
+            <span>Email</span>
+            <input id="auth-email" type="email" autocomplete="email" required />
+          </label>
+          <label class="field">
+            <span>Password</span>
+            <input id="auth-password" type="password" autocomplete="current-password" required />
+          </label>
+          <div class="error" id="auth-error" hidden></div>
+          <div class="note" id="auth-note" hidden></div>
+          <button class="btn primary" id="auth-submit" type="submit">Sign in</button>
+          <button class="link" id="auth-forgot" type="button">Forgot password?</button>
+        </form>
+        <div id="google-wrap" hidden>
+          <div class="or"><span>or</span></div>
+          <button class="btn" id="auth-google" type="button">
+            <svg viewBox="0 0 48 48" width="16" height="16"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
+            Continue with Google
+          </button>
+        </div>
+      </section>
+
+      <!-- Session setup -->
+      <section class="view" id="view-setup" hidden>
+        <div class="banner warn" id="verify-banner" hidden>
+          <div>Verify your email to use your free credits. We sent a link to <strong id="verify-email"></strong>.</div>
+          <div class="row">
+            <button class="btn small" id="verify-resend">Resend link</button>
+            <button class="btn small primary" id="verify-check">I've verified</button>
+          </div>
+        </div>
+
+        <div class="resume-card" id="resume-card" hidden>
+          <div>
+            <strong id="resume-title"></strong>
+            <div class="muted small" id="resume-meta"></div>
+          </div>
+          <button class="btn primary small" id="btn-resume">Resume</button>
+        </div>
+
+        <h2>New session</h2>
+        <div class="chips" id="mode-chips"></div>
+
+        <div id="role-wrap" hidden>
+          <div class="label">You are</div>
+          <div class="seg">
+            <button class="seg-btn active" data-role="candidate">The candidate</button>
+            <button class="seg-btn" data-role="interviewer">The interviewer</button>
+          </div>
+        </div>
+
+        <label class="field">
+          <span>Notes for the AI <em>(optional)</em></span>
+          <textarea id="setup-notes" rows="3" placeholder="Who you're meeting, what you're showing, key facts…"></textarea>
+        </label>
+
+        <div class="label">Documents <em>(optional)</em></div>
+        <div class="docs" id="docs"></div>
+        <div class="row wrap">
+          <button class="btn small" data-add-doc="resume" id="add-resume">+ Resume</button>
+          <button class="btn small" data-add-doc="requirements" id="add-req">+ Job requirements</button>
+          <button class="btn small" data-add-doc="other">+ Other text</button>
+          <label class="btn small file-btn">Upload file<input type="file" id="doc-file" accept=".txt,.md,.csv,.json,.html,.htm,text/*" multiple hidden /></label>
+        </div>
+
+        <details class="more">
+          <summary>Answer settings</summary>
+          <label class="field">
+            <span>Style</span>
+            <select id="setup-style">
+              <option value="natural">Natural, like I'd say it</option>
+              <option value="bullets">2–4 bullet points</option>
+              <option value="paragraph">2–3 sentences</option>
+              <option value="detailed">Detailed</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Language</span>
+            <input id="setup-language" placeholder="English" />
+          </label>
+          <label class="field">
+            <span>Answer instructions</span>
+            <textarea id="setup-instructions" rows="2" placeholder='e.g. "3 to 5 bullets with a real example, friendly tone"'></textarea>
+          </label>
+        </details>
+
+        <button class="btn primary big" id="btn-start">Start session</button>
+        <p class="muted small center">Works with meetings in Chrome: Google Meet, Teams and Zoom on the web.</p>
+      </section>
+
+      <!-- Session -->
+      <section class="view session" id="view-session" hidden>
+        <div class="session-bar">
+          <div class="session-title">
+            <strong id="session-name"></strong>
+            <span class="muted small" id="session-clock"></span>
+          </div>
+          <div class="row">
+            <button class="icon-btn" id="btn-export" title="Export chat (Markdown)" aria-label="Export chat">
+              <svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 4v11m0 0l-4-4m4 4l4-4M5 19h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <button class="icon-btn" id="btn-end" title="End session" aria-label="End session">
+              <svg viewBox="0 0 24 24" width="18" height="18"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="capture-strip" id="capture-strip">
+          <span class="dot" id="capture-dot"></span>
+          <span id="capture-text">Tap Listen while your meeting tab is showing.</span>
+          <button class="link small" id="capture-switch" hidden>Use current tab</button>
+        </div>
+
+        <div class="thread" id="thread">
+          <div class="empty" id="thread-empty">
+            <p><strong>When someone asks you something,</strong> tap <kbd>Listen</kbd> (or <kbd>Space</kbd> here, <kbd id="shortcut-key">Alt+Shift+Q</kbd> anywhere) and tap again when they finish.</p>
+            <p class="muted small">Only the audio between your two taps (plus 2 seconds before) is sent. Nothing else is recorded or saved.</p>
+          </div>
+        </div>
+
+        <div class="composer">
+          <div class="listen-row">
+            <button class="mic" id="btn-listen" aria-label="Listen">
+              <span class="ring" id="mic-ring"></span>
+              <svg viewBox="0 0 24 24" width="26" height="26"><rect x="9" y="3" width="6" height="12" rx="3" fill="currentColor"/><path d="M5.5 11.5a6.5 6.5 0 0013 0M12 18v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            </button>
+            <div class="listen-info">
+              <strong id="listen-label">Listen</strong>
+              <span class="muted small" id="listen-sub">Tap, let them ask, tap again</span>
+            </div>
+            <button class="btn small" id="btn-screen" title="Ask about what's on the meeting tab">
+              <svg viewBox="0 0 24 24" width="16" height="16"><rect x="3" y="4" width="18" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 21h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+              Screen
+            </button>
+          </div>
+          <form class="ask-row" id="ask-form">
+            <input id="ask-input" placeholder="Type a question…" autocomplete="off" />
+            <button class="btn primary small" type="submit">Ask</button>
+          </form>
+        </div>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" hidden></div>
+
+    <script type="module" src="sidepanel.js"></script>
+  </body>
+</html>
