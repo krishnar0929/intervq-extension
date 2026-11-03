@@ -47,6 +47,8 @@ npm run check
 ```
 
 Then in Chrome: `chrome://extensions` → turn on **Developer mode** → **Load unpacked** → pick this folder.
+The `key` in `manifest.json` pins the unpacked extension ID to `dgmaihjcefiebghacibndgdfchjchofg`, whichever
+folder or Mac it's loaded from, so Google sign-in keeps working.
 Pin IntervQ, open a meeting tab, click the IntervQ icon, sign in and start a session.
 
 After changing code, click the reload ↻ on the IntervQ card in `chrome://extensions` and reopen the panel.
@@ -57,7 +59,7 @@ After changing code, click the reload ↻ on the IntervQ card in `chrome://exten
 npm run zip
 ```
 
-This makes `dist/intervq-extension.zip` (manifest, icons and `src` only). Upload it in the
+This makes `dist/intervq-extension.zip` (manifest, icons and `src` only, without the manifest `key`). Upload it in the
 [Chrome Web Store developer dashboard](https://chrome.google.com/webstore/devconsole). Remember to bump
 `version` in `manifest.json` for each upload.
 
@@ -69,7 +71,7 @@ that client, one per extension ID:
 
 1. Google Cloud console → Google Auth Platform → Clients → **Web client (auto created by Google Service)**.
 2. Under *Authorized redirect URIs*, add `https://<extension-id>.chromiumapp.org/` and save.
-   The unpacked ID (`bnkbhmpdmijaididklhhcglcdgbcenpk` on the dev Mac) is already there. After publishing,
+   Add `https://dgmaihjcefiebghacibndgdfchjchofg.chromiumapp.org/` (the pinned unpacked ID). After publishing,
    add the Chrome Web Store ID too.
 
 ## Next up

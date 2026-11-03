@@ -3,6 +3,7 @@
   "name": "IntervQ",
   "short_name": "IntervQ",
   "version": "0.1.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAmamPbwXWbSeAvwN+QPSVrB3qH9+lVhuy300uCQI/bX+wLub3py1Qk1FZgvOPpUj2f1mvbOmekJuhlpJzKI/3Z9LSk4B3AhK21hF52AVsdNsAE+R2IioR5gNm6nhob/zXUlL5lTk6xPlnETa9Y1ZiXF5JYrX/F7Y8s3MTIGUiwt5bqcF24nn1VzUr3u5Eu6FBKW3lVg9WRLxGtE8ZOhdFoMGCAuYT7GgiekYqOxHdiYfUSo6Fh4nh+7AjVXz3ioj6b20JsjfB/FmDRT6UlO44MoXr4QuZU2xsUR624vRmhMOXMAeOq+xWLUg1oBy0XdO0ekRP9PyjedOtvDr+cP1K0QIDAQAB",
   "description": "Ace every question. Tap to capture a question in your browser meeting and get a suggested answer.",
   "icons": {
     "16": "icons/icon16.png",
