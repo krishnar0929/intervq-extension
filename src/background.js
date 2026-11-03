@@ -92,7 +92,9 @@ async function handle(msg) {
         return { ok: true, capture };
       } catch (e) {
         setCapture(null);
-        return { ok: false, error: await friendlyCaptureError(e) };
+        // Not invoked on this tab: the panel falls back to Chrome's tab picker instead of showing an error.
+        const code = /not been invoked|activeTab/i.test(String((e && e.message) || e)) ? 'not_invoked' : 'capture_failed';
+        return { ok: false, code, error: await friendlyCaptureError(e) };
       }
     }
     case 'listen-take':

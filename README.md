@@ -14,8 +14,12 @@ It uses the same IntervQ account, credits and server as the desktop app.
   Add notes, paste or upload text documents (resume, job requirements, agenda), and pick the answer style,
   language and your own answer instructions.
 - **Listen:** captures only the meeting tab's audio between your two taps, plus 2 seconds before the first
-  tap. You keep hearing the meeting while it's captured. Max 2 minutes per clip.
+  tap. You keep hearing the meeting while it's captured. Max 2 minutes per clip. The first tap asks you to
+  pick the meeting tab in Chrome's share picker (keep "Also share tab audio" on); pressing `Control+Space`
+  on the meeting tab connects it without the picker.
 - **Screen:** asks about what's showing in the meeting tab (type a note first to steer it).
+- **AI model** (Answer settings): the server's list by company and Fast / Balanced / Most capable, with the
+  credit cost per answer. Most capable models need the Pro plan.
 - **Typed questions**, and follow-ups on every answer: *Add example*, *Summarize*, *More detail*, *Simpler*,
   *Say it differently*.
 - **Credits** shown in the top bar; *Plans & credits* opens the account page.
@@ -35,8 +39,9 @@ Costs are the server's (`functions/src/plans.js` in meeting-assist): listen 2, s
 
 Nothing is recorded outside your two taps, and nothing is written to disk.
 
-Chrome only lets an extension capture a tab after you've used it on that tab, so **click the IntervQ icon
-(or press the shortcut) on the meeting tab** before the first Listen. Meetings in the Zoom or Teams *desktop
+Chrome only lets an extension capture a tab after it was used on that tab, and a click in the side panel
+doesn't count. So the mic button falls back to Chrome's tab picker (`src/lib/recorder.js` records that stream in
+the panel); the shortcut uses `chrome.tabCapture` through the offscreen recorder instead. Meetings in the Zoom or Teams *desktop
 apps* aren't in Chrome, so use the IntervQ desktop app for those.
 
 ## Try it locally
@@ -78,4 +83,3 @@ that client, one per extension ID:
 
 - PDF and Word uploads (text files only for now)
 - Auto-listen (answer when a question is detected)
-- Model picker (it uses the account's default model for now)

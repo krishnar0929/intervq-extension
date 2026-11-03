@@ -1,77 +1,19 @@
-// Holds the meeting tab's audio in memory. Between taps it keeps only a short pre-roll; after the first tap
-// ("mark") it keeps everything until the second tap ("take"), which returns a 16 kHz mono WAV as base64.
-// Nothing is written to disk.
-import { MAX_CLIP_SECONDS, PREROLL_SECONDS } from '../config.js';
-import { downsample, encodeWav, toBase64 } from '../lib/wav.js';
+// Holds the meeting tab's audio when it was connected through the keyboard shortcut (chrome.tabCapture), which
+// needs a document that outlives the service worker. See ../lib/recorder.js for how clips are kept and cut.
+import { Recorder } from '../lib/recorder.js';
 
-let ctx = null;
-let stream = null;
-let chunks = [];
-let total = 0;
-let recording = false;
-let lastLevelAt = 0;
-
-function trim(maxSeconds) {
-  const max = Math.round(maxSeconds * ctx.sampleRate);
-  while (chunks.length && total - chunks[0].length >= max) total -= chunks.shift().length;
-}
-
-function onChunk(mono) {
-  chunks.push(mono);
-  total += mono.length;
-  trim(recording ? MAX_CLIP_SECONDS : PREROLL_SECONDS);
-  if (recording && Date.now() - lastLevelAt > 100) {
-    lastLevelAt = Date.now();
-    let peak = 0;
-    for (let i = 0; i < mono.length; i++) peak = Math.max(peak, Math.abs(mono[i]));
-    chrome.runtime.sendMessage({ target: 'panel', type: 'level', level: Math.min(1, peak * 1.6) }).catch(() => {});
-  }
-}
+const recorder = new Recorder({
+  onLevel: (level) => chrome.runtime.sendMessage({ target: 'panel', type: 'level', level }).catch(() => {}),
+  onEnded: () => chrome.runtime.sendMessage({ target: 'sw-event', type: 'capture-ended' }).catch(() => {}),
+});
 
 async function start(streamId) {
-  await stop();
-  stream = await navigator.mediaDevices.getUserMedia({
+  const stream = await navigator.mediaDevices.getUserMedia({
     audio: { mandatory: { chromeMediaSource: 'tab', chromeMediaSourceId: streamId } },
     video: false,
   });
-  ctx = new AudioContext();
-  await ctx.audioWorklet.addModule(new URL('./recorder-worklet.js', import.meta.url));
-  const source = ctx.createMediaStreamSource(stream);
-  const node = new AudioWorkletNode(ctx, 'intervq-recorder', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2] });
-  node.port.onmessage = (e) => onChunk(e.data);
-  source.connect(node);
-  node.connect(ctx.destination); // keep the meeting audible
-  for (const track of stream.getAudioTracks()) {
-    track.addEventListener('ended', () => {
-      stop();
-      chrome.runtime.sendMessage({ target: 'sw-event', type: 'capture-ended' }).catch(() => {});
-    });
-  }
-}
-
-async function stop() {
-  recording = false;
-  chunks = [];
-  total = 0;
-  if (stream) stream.getTracks().forEach((t) => t.stop());
-  stream = null;
-  if (ctx) await ctx.close().catch(() => {});
-  ctx = null;
-}
-
-function take() {
-  if (!ctx) return { ok: false, error: 'The tab is no longer being captured. Tap Listen again.' };
-  recording = false;
-  const all = new Float32Array(total);
-  let o = 0;
-  for (const c of chunks) {
-    all.set(c, o);
-    o += c.length;
-  }
-  trim(PREROLL_SECONDS);
-  const seconds = all.length / ctx.sampleRate;
-  const wav = encodeWav(downsample(all, ctx.sampleRate, 16000), 16000);
-  return { ok: true, seconds, base64: toBase64(wav) };
+  // tabCapture mutes the tab, so play it back to keep the meeting audible.
+  await recorder.start(stream, { playback: true });
 }
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
@@ -82,18 +24,14 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         await start(msg.streamId);
         return { ok: true };
       case 'mark':
-        if (!ctx) return { ok: false, error: 'not capturing' };
-        if (ctx.state === 'suspended') await ctx.resume();
-        recording = true;
-        return { ok: true };
+        return (await recorder.mark()) ? { ok: true } : { ok: false, error: 'not capturing' };
       case 'take':
-        return take();
+        return recorder.take();
       case 'cancel':
-        recording = false;
-        if (ctx) trim(PREROLL_SECONDS);
+        recorder.cancel();
         return { ok: true };
       case 'stop-capture':
-        await stop();
+        await recorder.stop();
         return { ok: true };
       default:
         return { ok: false, error: `unknown message ${msg.type}` };

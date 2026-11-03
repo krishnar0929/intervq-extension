@@ -6,6 +6,7 @@ import * as auth from './lib/auth.js';
 import { ApiError, ask, getAccount, saveSession } from './lib/api.js';
 import { MODE_LABELS, REFINE_LABELS, buildMessages, parseReply } from './lib/prompts.js';
 import { esc, renderMarkdown, toMarkdownExport } from './lib/format.js';
+import { Recorder } from './lib/recorder.js';
 
 const $ = (id) => document.getElementById(id);
 const HISTORY_TURNS = 6; // earlier Q&A sent as context with each new question
@@ -87,6 +88,7 @@ async function refreshAccount() {
     state.account = await getAccount();
     renderCredits();
     renderVerifyBanner();
+    if (!$('view-setup').hidden) renderModels();
   } catch (e) {
     handleApiError(e);
   }
@@ -194,6 +196,55 @@ function renderDocs() {
   $('add-req').textContent = isInterview ? '+ Job requirements' : '+ Agenda / product info';
 }
 
+// The models the server offers (GET /account): by company, then Fast / Balanced / Most capable. Pricier models
+// cost more credits per answer (mult), and Most capable ones need the Pro plan.
+const TIER_ORDER = ['fast', 'balanced', 'best'];
+
+function chosenModel() {
+  const a = state.account;
+  if (!a || !a.models) return state.draft.model || undefined;
+  const m = a.models[state.draft.model];
+  return m && (!m.pro || a.pro) ? state.draft.model : a.defaultModel;
+}
+
+function renderModels() {
+  const sel = $('setup-model');
+  const a = state.account;
+  sel.innerHTML = '';
+  if (!a || !a.models) {
+    sel.innerHTML = '<option>Loading…</option>';
+    sel.disabled = true;
+    return;
+  }
+  sel.disabled = false;
+  const tiers = a.tierLabels || { fast: 'Fast', balanced: 'Balanced', best: 'Most capable' };
+  const providers = a.providers && a.providers.length ? a.providers : [{ id: 'google', label: 'Google Gemini' }];
+  for (const p of providers) {
+    const group = document.createElement('optgroup');
+    group.label = p.label;
+    Object.keys(a.models)
+      .filter((id) => a.models[id].provider === p.id)
+      .sort((x, y) => TIER_ORDER.indexOf(a.models[x].tier) - TIER_ORDER.indexOf(a.models[y].tier))
+      .forEach((id) => {
+        const m = a.models[id];
+        const o = document.createElement('option');
+        o.value = id;
+        const locked = m.pro && !a.pro;
+        o.textContent = `${m.label} · ${tiers[m.tier] || m.tier}${m.mult > 1 ? ` · ${m.mult}× credits` : ''}${locked ? ' · Pro plan' : ''}${id === a.defaultModel ? ' (default)' : ''}`;
+        o.disabled = locked;
+        group.appendChild(o);
+      });
+    if (group.children.length) sel.appendChild(group);
+  }
+  sel.value = chosenModel();
+  const m = a.models[sel.value] || {};
+  const costs = a.costs || { listen: 2, screen: 3, text: 1 };
+  const mult = Math.max(1, m.mult || 1);
+  $('model-hint').textContent =
+    `Each answer: listen ${costs.listen * mult}, screen ${costs.screen * mult}, typed ${costs.text * mult} credits.` +
+    (m.audio === false ? ' This model reads a transcript of the audio instead of hearing it.' : '');
+}
+
 function renderSetup() {
   const d = state.draft;
   renderModeChips();
@@ -204,6 +255,7 @@ function renderSetup() {
   $('setup-language').value = d.language;
   $('setup-instructions').value = d.instructions;
   renderDocs();
+  renderModels();
   renderVerifyBanner();
 
   const s = state.session;
@@ -232,6 +284,7 @@ function startSession() {
     notes: d.notes,
     docs: d.docs.filter((x) => String(x.text || '').trim()).map((x) => ({ ...x })),
     answerStyle: d.answerStyle,
+    model: chosenModel(),
     language: d.language.trim() || 'English',
     instructions: d.instructions,
     turns: [],
@@ -251,7 +304,8 @@ function openSession() {
   clearInterval(clockTimer);
   const tick = () => {
     const m = Math.floor((Date.now() - s.startedAt) / 60000);
-    $('session-clock').textContent = m < 1 ? 'Just started' : `${m} min`;
+    const model = state.account && state.account.models && state.account.models[s.model];
+    $('session-clock').textContent = `${m < 1 ? 'Just started' : `${m} min`}${model ? ` · ${model.label}` : ''}`;
     if (state.listening) updateListenTimer();
   };
   tick();
@@ -272,7 +326,7 @@ async function endSession(ask = true) {
   clearInterval(clockTimer);
   state.session = null;
   chrome.storage.local.remove(SESSION_KEY);
-  sw({ type: 'capture-stop' }).catch(() => {});
+  disconnect();
   saveSession({ id: s.id, mode: s.mode, startedAt: s.startedAt, endedAt: Date.now() }).catch(() => {});
   if (ask) goHome();
 }
@@ -371,7 +425,7 @@ async function runAsk(kind, input, { question = '', label = '' } = {}) {
   try {
     const { text, credits } = await ask({
       messages,
-      model: state.account && state.account.defaultModel,
+      model: s.model || (state.account && state.account.defaultModel),
       sessionId: s.id,
       signal: controller.signal,
       onDelta: (full) => {
@@ -475,9 +529,9 @@ function renderCaptureStrip() {
   const c = state.capture;
   const dot = $('capture-dot');
   dot.className = `dot${state.listening ? ' rec' : c ? ' on' : ''}`;
-  $('capture-text').textContent = c ? `${state.listening ? 'Listening to' : 'Connected to'}: ${c.title}` : 'Tap Listen while your meeting tab is showing.';
+  $('capture-text').textContent = c ? `${state.listening ? 'Listening to' : 'Connected to'}: ${c.title}` : 'Tap Listen and pick your meeting tab.';
   $('capture-switch').hidden = true;
-  if (c) {
+  if (c && !c.shared) {
     activeTab().then((tab) => {
       $('capture-switch').hidden = !tab || tab.id === c.tabId || state.listening;
     });
@@ -490,17 +544,83 @@ async function refreshCaptureStatus() {
   renderCaptureStrip();
 }
 
+// Where the audio comes from: 'tab' = chrome.tabCapture through the service worker (after the shortcut),
+// 'shared' = a tab the person picked in Chrome's share picker, recorded here in the panel.
+const shared = {
+  recorder: new Recorder({
+    onLevel: (level) => state.listening && ($('mic-ring').style.transform = `scale(${1 + level * 0.25})`),
+    onEnded: () => sharedEnded(),
+  }),
+  video: null, // the shared tab's picture, kept for "Screen" questions
+};
+let source = null; // 'tab' | 'shared'
+
+function sharedEnded() {
+  if (source !== 'shared') return;
+  if (state.listening) toast('Sharing stopped, so IntervQ can no longer hear the tab.');
+  source = null;
+  state.listening = false;
+  state.capture = null;
+  if (shared.video) shared.video.srcObject = null;
+  shared.video = null;
+  setListenUi();
+}
+
+// Chrome's own picker: "Choose a tab to share" with "Also share tab audio". Needs the click that got us here.
+async function pickTab() {
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getDisplayMedia({
+      video: { displaySurface: 'browser' },
+      audio: { suppressLocalAudioPlayback: false },
+      preferCurrentTab: false,
+      selfBrowserSurface: 'exclude',
+      surfaceSwitching: 'include',
+      systemAudio: 'exclude',
+      monitorTypeSurfaces: 'exclude',
+    });
+  } catch (e) {
+    if (e && e.name === 'NotAllowedError') return { ok: false, error: 'Pick your meeting tab in the window Chrome showed, then tap Listen again.' };
+    return { ok: false, error: `Couldn't open Chrome's tab picker: ${e.message}` };
+  }
+  if (!stream.getAudioTracks().length) {
+    stream.getTracks().forEach((t) => t.stop());
+    return { ok: false, error: 'No sound came with that share. Pick a Chrome tab and leave "Also share tab audio" switched on.' };
+  }
+  await shared.recorder.start(stream, { playback: false });
+  const video = document.createElement('video');
+  video.muted = true;
+  video.srcObject = new MediaStream(stream.getVideoTracks());
+  video.play().catch(() => {});
+  shared.video = video;
+  source = 'shared';
+  const label = (stream.getVideoTracks()[0] && stream.getVideoTracks()[0].label) || '';
+  return { ok: true, capture: { title: label && !/^(web-contents|screen|window)|:\/\//i.test(label) ? label : 'the tab you shared', shared: true } };
+}
+
 async function startListening(tabId, switchTab = false) {
   if (!state.session || state.busy) return;
-  const tab = tabId ? { id: tabId } : await activeTab();
-  if (!tab) return toast('Open your meeting tab first.');
   state.busy = true;
   setListenUi();
-  const r = await sw({ type: 'listen-start', tabId: tab.id, switchTab }).catch((e) => ({ ok: false, error: e.message }));
+  let r;
+  if (source === 'shared' && shared.recorder.active) {
+    r = { ok: true, capture: state.capture };
+  } else {
+    const tab = tabId ? { id: tabId } : await activeTab();
+    r = tab
+      ? await sw({ type: 'listen-start', tabId: tab.id, switchTab }).catch((e) => ({ ok: false, error: e.message }))
+      : { ok: false, code: 'not_invoked' };
+    if (r && r.ok) source = 'tab';
+    else if (r && r.code === 'not_invoked') {
+      // Chrome won't let a click in the panel capture a tab; ask the person to pick it instead.
+      r = await pickTab();
+    }
+  }
+  if (r && r.ok && source === 'shared') await shared.recorder.mark();
   state.busy = false;
   if (!r || !r.ok) {
     setListenUi();
-    toast((r && r.error) || "Couldn't start listening.", 6000);
+    toast((r && r.error) || "Couldn't start listening.", 7000);
     return;
   }
   state.capture = r.capture;
@@ -515,7 +635,10 @@ async function stopListening() {
   state.listening = false;
   state.busy = true;
   setListenUi();
-  const r = await sw({ type: 'listen-take' }).catch((e) => ({ ok: false, error: e.message }));
+  const r =
+    source === 'shared'
+      ? shared.recorder.take()
+      : await sw({ type: 'listen-take' }).catch((e) => ({ ok: false, error: e.message }));
   state.busy = false;
   setListenUi();
   if (!r || !r.ok) return toast((r && r.error) || 'Nothing was recorded.');
@@ -525,8 +648,18 @@ async function stopListening() {
 
 async function cancelListening() {
   state.listening = false;
-  await sw({ type: 'listen-cancel' }).catch(() => {});
+  if (source === 'shared') shared.recorder.cancel();
+  else await sw({ type: 'listen-cancel' }).catch(() => {});
   setListenUi();
+}
+
+async function disconnect() {
+  await sw({ type: 'capture-stop' }).catch(() => {});
+  if (shared.recorder.active) await shared.recorder.stop();
+  if (shared.video) shared.video.srcObject = null;
+  shared.video = null;
+  source = null;
+  state.capture = null;
 }
 
 // The keyboard shortcut (handled in the service worker, which has already connected the tab's audio).
@@ -543,11 +676,26 @@ function toggleListening(tabId) {
   else startListening(tabId);
 }
 
+// A still of the shared tab, when the person shared one through the picker.
+function sharedFrame() {
+  const v = shared.video;
+  if (source !== 'shared' || !v || !v.videoWidth) return null;
+  const scale = Math.min(1, 1600 / v.videoWidth);
+  const c = document.createElement('canvas');
+  c.width = Math.round(v.videoWidth * scale);
+  c.height = Math.round(v.videoHeight * scale);
+  c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+  return { ok: true, base64: c.toDataURL('image/jpeg', 0.7).split(',')[1] };
+}
+
 async function askScreen() {
   if (!state.session) return;
   const note = $('ask-input').value.trim();
-  const tab = await activeTab();
-  const r = await sw({ type: 'screenshot', tabId: tab && tab.id }).catch((e) => ({ ok: false, error: e.message }));
+  let r = sharedFrame();
+  if (!r) {
+    const tab = await activeTab();
+    r = await sw({ type: 'screenshot', tabId: tab && tab.id }).catch((e) => ({ ok: false, error: e.message }));
+  }
   if (!r || !r.ok) return toast((r && r.error) || "Couldn't take a screenshot.", 6000);
   $('ask-input').value = '';
   runAsk('screen', { imageBase64: r.base64, text: note }, { question: note || 'What should I say about this screen?' });
@@ -647,6 +795,11 @@ function wire() {
   bind('setup-notes', 'notes');
   bind('setup-language', 'language');
   bind('setup-instructions', 'instructions');
+  $('setup-model').onchange = () => {
+    state.draft.model = $('setup-model').value;
+    saveDraft();
+    renderModels();
+  };
   $('setup-style').onchange = () => {
     state.draft.answerStyle = $('setup-style').value;
     saveDraft();
@@ -688,8 +841,7 @@ function wire() {
   $('capture-switch').onclick = async () => {
     const tab = await activeTab();
     if (!tab) return;
-    await sw({ type: 'capture-stop' });
-    state.capture = null;
+    await disconnect();
     renderCaptureStrip();
     toast('Tap Listen to use this tab.');
   };
@@ -719,7 +871,7 @@ function wire() {
       onShortcut(msg);
       sendResponse({ ok: true });
       return false;
-    } else if (msg.type === 'capture-ended') {
+    } else if (msg.type === 'capture-ended' && source !== 'shared') {
       if (state.listening) toast('The meeting tab stopped being captured.');
       state.listening = false;
       state.capture = null;

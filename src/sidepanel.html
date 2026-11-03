@@ -113,6 +113,11 @@
         <details class="more">
           <summary>Answer settings</summary>
           <label class="field">
+            <span>AI model</span>
+            <select id="setup-model"></select>
+            <span class="hint" id="model-hint"></span>
+          </label>
+          <label class="field">
             <span>Style</span>
             <select id="setup-style">
               <option value="natural">Natural, like I'd say it</option>
@@ -154,7 +159,7 @@
 
         <div class="capture-strip" id="capture-strip">
           <span class="dot" id="capture-dot"></span>
-          <span id="capture-text">Tap Listen while your meeting tab is showing.</span>
+          <span id="capture-text">Tap Listen and pick your meeting tab.</span>
           <button class="link small" id="capture-switch" hidden>Use current tab</button>
         </div>
 
