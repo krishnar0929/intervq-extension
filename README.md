@@ -2,7 +2,7 @@
 
 The browser companion to the IntervQ desktop app. It lives in Chrome's side panel next to your meeting
 (Google Meet, Teams or Zoom on the web). When someone asks a question, **tap Listen** (or `Space` in the
-panel, `Alt+Shift+Q` / `Option+Shift+Q` anywhere), and **tap again** when they finish. A suggested answer
+panel, `Control+Space` anywhere in Chrome), and **tap again** when they finish. A suggested answer
 streams into the panel and you answer in your own words.
 
 It uses the same IntervQ account, credits and server as the desktop app.

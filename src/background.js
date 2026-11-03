@@ -35,11 +35,17 @@ async function ensureOffscreen() {
 const toOffscreen = (msg) => chrome.runtime.sendMessage({ target: 'offscreen', ...msg });
 const toPanel = (msg) => chrome.runtime.sendMessage({ target: 'panel', ...msg }).catch(() => {});
 
-function friendlyCaptureError(e) {
+async function shortcutLabel() {
+  const cmds = await chrome.commands.getAll().catch(() => []);
+  const c = cmds.find((x) => x.name === 'toggle-listen');
+  return (c && c.shortcut) || 'the IntervQ shortcut';
+}
+
+async function friendlyCaptureError(e) {
   const m = String((e && e.message) || e);
   console.warn('IntervQ capture failed:', m);
   if (/not been invoked|activeTab/i.test(m)) {
-    return `Press Option+Shift+Q (Alt+Shift+Q on Windows) while the meeting tab is showing. Chrome needs that before IntervQ can hear the tab. (${m})`;
+    return `Press ${await shortcutLabel()} while the meeting tab is showing. Chrome needs that before IntervQ can hear the tab. (${m})`;
   }
   if (/active stream|already/i.test(m)) return 'Another extension or app is already capturing this tab. Stop it and try again.';
   if (/chrome:\/\/|webstore|Chrome pages/i.test(m)) return "Chrome doesn't allow capturing this kind of page. Open your meeting tab and try again.";
@@ -83,7 +89,7 @@ async function handle(msg) {
         return { ok: true, capture };
       } catch (e) {
         setCapture(null);
-        return { ok: false, error: friendlyCaptureError(e) };
+        return { ok: false, error: await friendlyCaptureError(e) };
       }
     }
     case 'listen-take':

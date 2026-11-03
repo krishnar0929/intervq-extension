@@ -34,8 +34,8 @@
   "commands": {
     "toggle-listen": {
       "suggested_key": {
-        "default": "Alt+Shift+Q",
-        "mac": "Alt+Shift+Q"
+        "default": "Ctrl+Space",
+        "mac": "MacCtrl+Space"
       },
       "description": "Start / stop listening for a question"
     }
